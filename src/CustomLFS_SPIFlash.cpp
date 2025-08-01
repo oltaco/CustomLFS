@@ -4,7 +4,8 @@
  * 
  * The MIT License (MIT)
  *
- * Copyright (c) 2025 
+ * Copyright (c) 2020, Paul Stoffregen, paul@pjrc.com
+ * Copyright (c) 2025 oltaco <taco@sly.nu>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -170,6 +171,7 @@ CustomLFS_SPIFlash::CustomLFS_SPIFlash(uint8_t csPin, SPIClass &spiPort)
 
 bool CustomLFS_SPIFlash::begin(uint8_t csPin, SPIClass &spiPort)
 {
+  //  need to tighten up these pin checks, 255 and -1 are both common "disabled/unavailable" values
   if (csPin != 255) {
     _csPin = csPin;
   }
@@ -290,7 +292,7 @@ bool CustomLFS_SPIFlash::readJEDECID(uint8_t *id)
   digitalWrite(_csPin, HIGH);
   _spi->endTransaction();
   
-  // Valid JEDEC ID should not be all 0x00 or all 0xFF
+  // this check is maybe too strict, some no-name chips might return 0x00 as manufacturer ID?
   return (id[0] != 0x00 && id[0] != 0xFF);
 }
 

@@ -2,6 +2,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 hathach for Adafruit Industries
+ * Copyright (c) 2025 oltaco <taco@sly.nu>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +32,7 @@
 
 using namespace Adafruit_LittleFS_Namespace;
 
-// Default flash configuration (maintains backward compatibility)
+// Default flash configuration (maintains backward compatibility with UserData region)
 #ifdef NRF52840_XXAA
   #define LFS_DEFAULT_FLASH_ADDR        0xED000
 #else
@@ -44,12 +45,12 @@ using namespace Adafruit_LittleFS_Namespace;
 class CustomLFS : public Adafruit_LittleFS
 {
 protected:
-  // Flash region configuration - now protected for derived classes
+  // Flash region configuration
   uint32_t _flash_addr;
   uint32_t _flash_total_size;
   uint32_t _block_size;
   
-  // LFS configuration structure (one per instance) - now protected
+  // LFS configuration structure (one per instance)
   struct lfs_config _lfs_config;
   
   // Helper function to convert block to address
@@ -57,7 +58,7 @@ protected:
     return _flash_addr + block * _block_size;
   }
   
-  // Configure the LFS config structure - now protected for derived classes
+  // Configure the LFS config structure
   virtual void _configure_lfs();
 
 private:

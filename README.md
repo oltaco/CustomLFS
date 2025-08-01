@@ -1,7 +1,8 @@
 # CustomLFS Library
+**CAUTION - THIS IS EXPERIMENTAL PRE-ALPHA SOFTWARE!!**
+**IT MIGHT BREAK THINGS, YOU HAVE BEEN WARNED!!**
 
 This library supports both nRF5x on-chip flash (including custom areas not just the 28kb UserData area!) and external SPI flash memory chips, providing a unified filesystem interface for embedded applications.
-
 
 ## Installation
 
