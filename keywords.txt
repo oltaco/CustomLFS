@@ -1,0 +1,76 @@
+#######################################
+# Syntax Coloring Map For CustomLFS
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+CustomLFS	KEYWORD1
+CustomLFS_SPIFlash	KEYWORD1
+SPIFlashChip	KEYWORD1
+SPIFlashChipExt	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+setFlashRegion	KEYWORD2
+getFlashAddr	KEYWORD2
+getFlashSize	KEYWORD2
+getBlockSize	KEYWORD2
+formatRegion	KEYWORD2
+validateFlashRegion	KEYWORD2
+
+detectChip	KEYWORD2
+getSectorSize	KEYWORD2
+getChipName	KEYWORD2
+isReady	KEYWORD2
+supportsFastRead	KEYWORD2
+supportsQSPI	KEYWORD2
+getMaxClockMHz	KEYWORD2
+setCSPin	KEYWORD2
+setSPIPort	KEYWORD2
+setSPISpeed	KEYWORD2
+lowLevelFormat	KEYWORD2
+testFlash	KEYWORD2
+flashRead	KEYWORD2
+flashProgram	KEYWORD2
+flashErase	KEYWORD2
+flashSync	KEYWORD2
+readJEDECID	KEYWORD2
+waitReady	KEYWORD2
+writeEnable	KEYWORD2
+writeDisable	KEYWORD2
+readStatus	KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+CustomFS	KEYWORD2
+FlashFS	KEYWORD2
+SPIFlash	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+LFS_DEFAULT_FLASH_ADDR	LITERAL1
+LFS_DEFAULT_FLASH_TOTAL_SIZE	LITERAL1
+LFS_DEFAULT_BLOCK_SIZE	LITERAL1
+
+CMD_READ_JEDEC_ID	LITERAL1
+CMD_READ_STATUS	LITERAL1
+CMD_WRITE_ENABLE	LITERAL1
+CMD_WRITE_DISABLE	LITERAL1
+CMD_PAGE_PROGRAM	LITERAL1
+CMD_READ_DATA	LITERAL1
+CMD_FAST_READ	LITERAL1
+CMD_SECTOR_ERASE_4K	LITERAL1
+CMD_BLOCK_ERASE_32K	LITERAL1
+CMD_BLOCK_ERASE_64K	LITERAL1
+CMD_CHIP_ERASE	LITERAL1
+STATUS_WIP	LITERAL1
+STATUS_WEL	LITERAL1
