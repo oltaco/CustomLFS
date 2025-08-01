@@ -88,6 +88,23 @@ const SPIFlashChipExt spiFlashChipsExt[] = {
     .is_fram = 0,                        // Flash Memory
     .name = "P25Q16H"
   },
+  // MX25R1635F (Thinknode M1)
+  {
+    .total_size = (1UL << 21),           // 2MiB
+    .start_up_time_us = 800,
+    .manufacturer_id = 0xC2,
+    .memory_type = 0x28,
+    .capacity = 0x15,
+    .max_clock_speed_mhz = 33,           /* 8 mhz for dual/quad */ \
+    .quad_enable_bit_mask = 0x80,
+    .has_sector_protection = false,
+    .supports_fast_read = true,
+    .supports_qspi = true,
+    .supports_qspi_writes = true,
+    .write_status_register_split = false,
+    .single_status_byte = true,
+    .name = "MX25R1635F"
+}
   
   // Add more extended chips here as needed
 };
