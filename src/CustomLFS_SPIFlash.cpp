@@ -196,8 +196,34 @@ bool CustomLFS_SPIFlash::begin(uint8_t csPin, SPIClass &spiPort)
   
   _flashReady = true;
   
-  // Try to mount the filesystem
-  return CustomLFS::begin();
+  Serial.print("Attempting to mount SPI flash...");
+  // lowLevelFormat();  // Ensure flash is formatted before mounting
+  // Try to mount the filesystem using the base Adafruit_LittleFS class
+  // Pass our config explicitly to avoid any confusion
+  if (!Adafruit_LittleFS::begin(&_lfs_config)) {
+    Serial.println(" failed!");
+    Serial.println("Formatting SPI flash...");
+    
+    // Format the filesystem
+    if (!this->format()) {
+      Serial.println("SPI Flash format failed!");
+      return false;
+    }
+    
+    Serial.println("Format complete, attempting mount...");
+    
+    // Try to mount again with our config
+    if (!Adafruit_LittleFS::begin(&_lfs_config)) {
+      Serial.println("SPI Flash mount failed after format!");
+      return false;
+    }
+    
+    Serial.println("SPI Flash formatted and mounted successfully!");
+  } else {
+    Serial.println(" success!");
+  }
+
+  return true;
 }
 
 bool CustomLFS_SPIFlash::detectChip()
@@ -545,6 +571,8 @@ bool CustomLFS_SPIFlash::lowLevelFormat()
     return false;
   }
   
+  Serial.println("Starting low-level SPI flash format...");
+  
   // Unmount if mounted
   File testRoot = open("/");
   bool isMounted = testRoot;
@@ -554,16 +582,30 @@ bool CustomLFS_SPIFlash::lowLevelFormat()
     end();
   }
   
-  // Erase all sectors
+  // Erase all sectors with progress indication
+  Serial.print("Erasing ");
+  Serial.print(_totalSize / 1024);
+  Serial.println(" KB flash...");
+  
   for (uint32_t addr = 0; addr < _totalSize; addr += _sectorSize) {
     if (!flashErase(addr)) {
+      Serial.print("Failed to erase sector at 0x");
+      Serial.println(addr, HEX);
       return false;
     }
+    
+    // Show progress every 64 sectors (256KB for 4KB sectors)
+    if ((addr % (64 * _sectorSize)) == 0) {
+      Serial.print("Progress: ");
+      Serial.print((addr * 100) / _totalSize);
+      Serial.println("%");
+    }
   }
-  
-  // Format the filesystem
-  return format();
+
+  Serial.println("Low-level format complete!");
+  return true;
 }
+
 
 bool CustomLFS_SPIFlash::testFlash()
 {
