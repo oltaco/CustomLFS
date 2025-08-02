@@ -206,7 +206,6 @@ CustomLFS_SPIFlash::CustomLFS_SPIFlash(uint8_t csPin, SPIClass &spiPort)
 
 bool CustomLFS_SPIFlash::begin(uint8_t csPin, SPIClass &spiPort)
 {
-  //  need to tighten up these pin checks, 255 and -1 are both common "disabled/unavailable" values
   if (csPin != 255) {
     _csPin = csPin;
   }
@@ -232,14 +231,32 @@ bool CustomLFS_SPIFlash::begin(uint8_t csPin, SPIClass &spiPort)
   _flashReady = true;
   
   Serial.print("Attempting to mount SPI flash...");
-  // lowLevelFormat();  // Ensure flash is formatted before mounting
+  
   // Try to mount the filesystem using the base Adafruit_LittleFS class
   // Pass our config explicitly to avoid any confusion
   if (!Adafruit_LittleFS::begin(&_lfs_config)) {
     Serial.println(" failed!");
     Serial.println("Formatting SPI flash...");
     
-    // Format the filesystem
+    // Erase all SPI flash sectors first
+    for (uint32_t addr = 0; addr < _totalSize; addr += _sectorSize) {
+      if (!flashErase(addr)) {
+        Serial.print("Failed to erase sector at 0x");
+        Serial.println(addr, HEX);
+        return false;
+      }
+      
+      // Show progress for large chips
+      if (_totalSize > 1048576 && (addr % (64 * _sectorSize)) == 0) {
+        Serial.print("Erasing: ");
+        Serial.print((addr * 100) / _totalSize);
+        Serial.println("%");
+      }
+    }
+    
+    Serial.println("Erasing complete, formatting LittleFS...");
+    
+    // Format the filesystem - this should use our SPI flash config
     if (!this->format()) {
       Serial.println("SPI Flash format failed!");
       return false;
@@ -636,9 +653,22 @@ bool CustomLFS_SPIFlash::lowLevelFormat()
       Serial.println("%");
     }
   }
-
+  
+  Serial.println("Erase complete, formatting filesystem...");
+  
+  // Format the filesystem
+  if (!format()) {
+    Serial.println("Filesystem format failed!");
+    return false;
+  }
+  
   Serial.println("Low-level format complete!");
   return true;
+}
+
+bool CustomLFS_SPIFlash::formatSPIFlash()
+{
+  return lowLevelFormat();
 }
 
 

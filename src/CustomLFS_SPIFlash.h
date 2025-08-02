@@ -145,6 +145,7 @@ public:
   // Low-level flash operations (for advanced users)
   bool lowLevelFormat();
   bool testFlash();
+  bool formatSPIFlash(); 
   
   // Override parent class methods that might conflict
   bool setFlashRegion(uint32_t flash_addr, uint32_t flash_size, 
