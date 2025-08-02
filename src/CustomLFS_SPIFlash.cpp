@@ -97,12 +97,13 @@ const SPIFlashChipExt spiFlashChipsExt[] = {
     .capacity = 0x15,
     .max_clock_speed_mhz = 33,           /* 8 mhz for dual/quad */ \
     .quad_enable_bit_mask = 0x80,
-    .has_sector_protection = false,
-    .supports_fast_read = true,
-    .supports_qspi = true,
-    .supports_qspi_writes = true,
-    .write_status_register_split = false,
-    .single_status_byte = true,
+    .has_sector_protection = 0,
+    .supports_fast_read = 1,
+    .supports_qspi = 1,
+    .supports_qspi_writes = 1,
+    .write_status_register_split = 0,
+    .single_status_byte = 1,
+    .is_fram = 0,                        // Flash Memory
     .name = "MX25R1635F"
 }
   
