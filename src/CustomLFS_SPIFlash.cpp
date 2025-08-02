@@ -105,8 +105,25 @@ const SPIFlashChipExt spiFlashChipsExt[] = {
     .single_status_byte = 1,
     .is_fram = 0,                        // Flash Memory
     .name = "MX25R1635F"
-}
-  
+},
+    // ZD25WQ16B (T-Echo)
+  {
+    .total_size = (1UL << 21),           // 2MiB
+    .start_up_time_us = 12000,
+    .manufacturer_id = 0xba,
+    .memory_type = 0x60,
+    .capacity = 0x15,
+    .max_clock_speed_mhz = 85,
+    .quad_enable_bit_mask = 0x02,
+    .has_sector_protection = 0,
+    .supports_fast_read = 1,
+    .supports_qspi = 1,
+    .supports_qspi_writes = 1,
+    .write_status_register_split = 0,
+    .single_status_byte = 0,
+    .is_fram = 0,
+    .name = "ZD25WQ16B"
+  }
   // Add more extended chips here as needed
 };
 
