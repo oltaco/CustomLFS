@@ -38,6 +38,31 @@
 #include "Adafruit_LittleFS.h"
 using namespace Adafruit_LittleFS_Namespace;
 
+// if the pins aren't defined we can't compile on boards without QSPI.
+#ifndef PIN_QSPI_SCK
+#define PIN_QSPI_SCK -1
+#endif
+
+#ifndef PIN_QSPI_CS
+#define PIN_QSPI_CS -1
+#endif
+
+#ifndef PIN_QSPI_IO0
+#define PIN_QSPI_IO0 -1
+#endif
+
+#ifndef PIN_QSPI_IO1
+#define PIN_QSPI_IO1 -1
+#endif
+
+#ifndef PIN_QSPI_IO2
+#define PIN_QSPI_IO2 -1
+#endif
+
+#ifndef PIN_QSPI_IO3
+#define PIN_QSPI_IO3 -1
+#endif
+
 
 // QSPI Flash chip configuration structure
 struct QSPIFlashChip {
