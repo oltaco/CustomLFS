@@ -1,7 +1,7 @@
 /* 
  * CustomLFS_QSPIFlash.cpp - QSPI Flash support for CustomLFS
  * 
- * Copyright (c) 2025 oltaco <taco@sly.nu>
+* Copyright (c) 2025 oltaco <taco@sly.nu>
  *
  * The MIT License (MIT)
  *
@@ -80,7 +80,29 @@ const QSPIFlashChip qspiFlashChips[] = {
     .erase_timeout_ms = 300,
     .startup_delay_us = 10000,
     .name = "P25Q16H"
-  }
+  },
+  // Macronix MX25R1635F - Thinknode M1 / Lilygo T-Echo
+  {
+  .jedec_id = {0xC2, 0x28, 0x15},          // Manufacturer ID (Macronix), Memory Type, Capacity
+  .total_size = 2097152,                  // 2MB
+  .sector_size = 4096,                    // 4KB sectors
+  .page_size = 256,                       // 256-byte pages
+  .address_bits = 24,                     // 3-byte addressing
+  .read_opcode = 0xEB,                    // Fast Read Quad I/O (4-4-4)
+  .program_opcode = 0x38,                 // Quad Page Program (1-1-4)
+  .erase_opcode = 0x20,                   // Sector Erase (4KB)
+  .status_opcode = 0x05,                  // Read Status Register
+  .supports_quad_read = true,
+  .supports_quad_write = true,
+  .quad_enable_register = 1,             // QE bit is in Status Register-2 (C2h = Volatile SR, but we use SR2)
+  .quad_enable_bit = 6,                  // QE bit is bit 6 in Status Register 2
+  .quad_enable_volatile = false,         // QE is non-volatile
+  .max_clock_hz = 80000000,              // Max QSPI clock rate
+  .write_timeout_ms = 5,
+  .erase_timeout_ms = 400,
+  .startup_delay_us = 10000,
+  .name = "MX25R1635F"
+}
 };
 
 const uint32_t qspiFlashChipCount = sizeof(qspiFlashChips) / sizeof(qspiFlashChips[0]);
