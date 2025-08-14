@@ -1,6 +1,5 @@
 /* 
  * CustomLFS_QSPIFlash.cpp - QSPI Flash support for CustomLFS
- * Version v0.1
  * 
  * Copyright (c) 2025 oltaco <taco@sly.nu>
  *
@@ -37,7 +36,7 @@
 
 // Simple QSPI Flash chip database - minimal for compatibility
 const QSPIFlashChip qspiFlashChips[] = {
-  // Winbond W25Q16JV
+  // Winbond W25Q16JV - Very common
   {
     .jedec_id = {0xEF, 0x40, 0x15},
     .total_size = 2097152,              // 2MB
@@ -59,7 +58,8 @@ const QSPIFlashChip qspiFlashChips[] = {
     .startup_delay_us = 10000,
     .name = "W25Q16JV"
   },
-  // PUYA P25Q16H - WioTrackerL1 / Xiao NRF52840
+  
+  // PUYA P25Q16H - Nordic boards
   {
     .jedec_id = {0x85, 0x60, 0x15},
     .total_size = 2097152,
@@ -80,31 +80,8 @@ const QSPIFlashChip qspiFlashChips[] = {
     .erase_timeout_ms = 300,
     .startup_delay_us = 10000,
     .name = "P25Q16H"
-  },
-  // Macronix MX25R1635F (Thinknode M1)
-  {
-    .jedec_id = {0xC2, 0x28, 0x15},
-    .total_size = 2097152,              // 2MB
-    .sector_size = 4096,
-    .page_size = 256,
-    .address_bits = 24,
-    .read_opcode = 0xEB,
-    .program_opcode = 0x32,
-    .erase_opcode = 0x20,
-    .status_opcode = 0x05,
-    .supports_quad_read = true,
-    .supports_quad_write = true,
-    .quad_enable_register = 2,
-    .quad_enable_bit = 1,
-    .quad_enable_volatile = false,
-    .max_clock_hz = 80000000,           // 8MHz max for quad mode in low power mode
-    .write_timeout_ms = 5,
-    .erase_timeout_ms = 400,
-    .startup_delay_us = 10000,
-    .name = "MX25R1635F"
   }
 };
-
 
 const uint32_t qspiFlashChipCount = sizeof(qspiFlashChips) / sizeof(qspiFlashChips[0]);
 
@@ -115,13 +92,16 @@ CustomLFS_QSPIFlash QSPIFlash;
 // Event Handler - Simplified for compatibility
 //--------------------------------------------------------------------+
 
+// Modified event handler
 void CustomLFS_QSPIFlash::qspi_event_handler(nrfx_qspi_evt_t event, void *p_context)
 {
   CustomLFS_QSPIFlash* fs = (CustomLFS_QSPIFlash*)p_context;
   
   if (fs) {
-    fs->_operation_pending = false;  // Always clear the pending flag
-    fs->_last_error = NRFX_SUCCESS;  // Assume success (could be enhanced)
+    fs->_operation_pending = false;
+    fs->_operation_complete = true;
+    fs->_operation_result = (event == NRFX_QSPI_EVENT_DONE) ? NRFX_SUCCESS : NRFX_ERROR_INTERNAL;
+    fs->_current_operation = QSPI_OP_NONE;
   }
 }
 
@@ -135,7 +115,31 @@ int CustomLFS_QSPIFlash::_qspi_read(const struct lfs_config *c, lfs_block_t bloc
   CustomLFS_QSPIFlash* fs = (CustomLFS_QSPIFlash*)c->context;
   uint32_t addr = block * c->block_size + off;
   
-  return fs->qspiRead(addr, buffer, size) ? 0 : -1;
+  bool result = fs->qspiRead(addr, buffer, size);
+  if (!result) {
+    Serial.print("LFS READ FAILED: block=");
+    Serial.print(block);
+    Serial.print(", addr=0x");
+    Serial.println(addr, HEX);
+  }
+  
+  return result ? 0 : -1;
+}
+
+int CustomLFS_QSPIFlash::_qspi_erase(const struct lfs_config *c, lfs_block_t block)
+{
+  CustomLFS_QSPIFlash* fs = (CustomLFS_QSPIFlash*)c->context;
+  uint32_t addr = block * c->block_size;
+  
+  bool result = fs->qspiErase(addr);
+  if (!result) {
+    Serial.print("LFS ERASE FAILED: block=");
+    Serial.print(block);
+    Serial.print(", addr=0x");
+    Serial.println(addr, HEX);
+  }
+  
+  return result ? 0 : -1;
 }
 
 int CustomLFS_QSPIFlash::_qspi_prog(const struct lfs_config *c, lfs_block_t block, 
@@ -144,16 +148,17 @@ int CustomLFS_QSPIFlash::_qspi_prog(const struct lfs_config *c, lfs_block_t bloc
   CustomLFS_QSPIFlash* fs = (CustomLFS_QSPIFlash*)c->context;
   uint32_t addr = block * c->block_size + off;
   
-  return fs->qspiWrite(addr, buffer, size) ? 0 : -1;
+  bool result = fs->qspiWrite(addr, buffer, size);
+  if (!result) {
+    Serial.print("LFS WRITE FAILED: block=");
+    Serial.print(block);
+    Serial.print(", addr=0x");
+    Serial.println(addr, HEX);
+  }
+  
+  return result ? 0 : -1;
 }
 
-int CustomLFS_QSPIFlash::_qspi_erase(const struct lfs_config *c, lfs_block_t block)
-{
-  CustomLFS_QSPIFlash* fs = (CustomLFS_QSPIFlash*)c->context;
-  uint32_t addr = block * c->block_size;
-  
-  return fs->qspiErase(addr) ? 0 : -1;
-}
 
 int CustomLFS_QSPIFlash::_qspi_sync(const struct lfs_config *c)
 {
@@ -170,7 +175,7 @@ CustomLFS_QSPIFlash::CustomLFS_QSPIFlash()
   , _qspi_initialized(false)
   , _quad_mode_enabled(false)
   , _chip(nullptr)
-  , _total_size(2097152)    // Default 1MB
+  , _total_size(1048576)    // Default 1MB
   , _sector_size(4096)      // Default 4KB sectors
   , _page_size(256)         // Default 256B pages
   , _is_4byte_addr(false)
@@ -197,10 +202,18 @@ bool CustomLFS_QSPIFlash::begin(uint8_t sck_pin, uint8_t csn_pin, uint8_t io0_pi
   if (_qspi_initialized) {
     return false;
   }
-  
   Serial.println("Starting QSPI initialization...");
   
-  // Configure using the working example's approach
+  // Initialize operation state
+  _operation_pending = false;
+  _operation_complete = false;
+  _current_operation = QSPI_OP_NONE;
+  _operation_result = NRFX_SUCCESS;
+  _quad_mode_enabled = false;
+  _quad_read_enabled = false;
+  _quad_write_enabled = false;
+  
+  // Configure using conservative settings initially
   memset(&_qspi_config, 0, sizeof(_qspi_config));
   
   // Pin configuration
@@ -211,42 +224,33 @@ bool CustomLFS_QSPIFlash::begin(uint8_t sck_pin, uint8_t csn_pin, uint8_t io0_pi
   _qspi_config.pins.io2_pin = g_ADigitalPinMap[io2_pin];
   _qspi_config.pins.io3_pin = g_ADigitalPinMap[io3_pin];
   
-  // Protocol configuration (start with basics) see qspi hal
-  _qspi_config.prot_if.readoc = NRF_QSPI_READOC_FASTREAD;  // single data line
-  _qspi_config.prot_if.writeoc = NRF_QSPI_WRITEOC_PP;      // single data line  
+  // Protocol configuration (start conservative)
+  _qspi_config.prot_if.readoc = NRF_QSPI_READOC_FASTREAD;
+  _qspi_config.prot_if.writeoc = NRF_QSPI_WRITEOC_PP;
   _qspi_config.prot_if.addrmode = NRF_QSPI_ADDRMODE_24BIT;
-  _qspi_config.prot_if.dpmconfig = false;  // Disable DPM initially
+  _qspi_config.prot_if.dpmconfig = false;
   
-  // Physical interface
-  _qspi_config.phy_if.sck_freq = NRF_QSPI_FREQ_32MDIV2;    // 16MHz
+  // Physical interface (start with conservative speed)
+  _qspi_config.phy_if.sck_freq = NRF_QSPI_FREQ_32MDIV2;
   _qspi_config.phy_if.spi_mode = NRF_QSPI_MODE_0;
   _qspi_config.phy_if.dpmen = false;
   
-  Serial.print("QSPI pins: SCK=");
-  Serial.print(sck_pin);
-  Serial.print(" CSN=");
-  Serial.print(csn_pin);
-  Serial.print(" IO0=");
-  Serial.print(io0_pin);
-  Serial.print(" IO1=");
-  Serial.print(io1_pin);
-  Serial.print(" IO2=");
-  Serial.print(io2_pin);
-  Serial.print(" IO3=");
-  Serial.println(io3_pin);
+  _clock_frequency = 16000000;
   
-  // Initialize QSPI using blocking mode
-  nrfx_err_t err = nrfx_qspi_init(&_qspi_config, NULL, NULL);
+  
+  // Initialize QSPI with event handler
+  nrfx_err_t err = nrfx_qspi_init(&_qspi_config, qspi_event_handler, this);
   if (err != NRFX_SUCCESS) {
     Serial.print("QSPI init failed: 0x");
     Serial.println(err, HEX);
     return false;
   }
+  NVIC_SetPriority(QSPI_IRQn, 2);  // Set QSPI IRQ priority lower to avoid conflict.
+
   
   Serial.println("QSPI driver initialized");
   
-  
-  // Activate QSPI tasks (this was missing!)
+  // Activate QSPI tasks
   Serial.println("Activating QSPI...");
   NRF_QSPI->TASKS_ACTIVATE = 1;
   
@@ -260,12 +264,19 @@ bool CustomLFS_QSPIFlash::begin(uint8_t sck_pin, uint8_t csn_pin, uint8_t io0_pi
   Serial.println("QSPI is ready");
   _qspi_initialized = true;
   
+  // Detect flash chip
+  if (!detectChip()) {
+    Serial.println("Chip detection failed");
+    return false;
+  }
+  
+  // // Run comprehensive tests
   // testFlash();
+  
+  _configure_lfs();
   // testLFSCallbacks();
 
-  // Continue with filesystem setup...
-  _configure_lfs();
-  
+  // Mount filesystem
   if (!Adafruit_LittleFS::begin(&_lfs_config)) {
     Serial.println("Mount failed, formatting...");
     if (!format()) {
@@ -284,42 +295,44 @@ bool CustomLFS_QSPIFlash::begin(uint8_t sck_pin, uint8_t csn_pin, uint8_t io0_pi
   return true;
 }
 
+// handy for debugging but can probably be removed now.
 bool CustomLFS_QSPIFlash::testLFSCallbacks()
 {
   Serial.println("Testing LittleFS callbacks directly...");
   
+  resetOperationState();
+  
   uint8_t testBuffer[256];
   memset(testBuffer, 0xAA, sizeof(testBuffer));
   
-  // Test erase
   Serial.println("Testing erase callback...");
-  int result = _qspi_erase(&_lfs_config, 0);  // Erase block 0
+  int result = _qspi_erase(&_lfs_config, 0);
   if (result != 0) {
     Serial.print("Erase callback failed: ");
     Serial.println(result);
+    resetOperationState();
     return false;
   }
   
-  // Test write
   Serial.println("Testing write callback...");
   result = _qspi_prog(&_lfs_config, 0, 0, testBuffer, sizeof(testBuffer));
   if (result != 0) {
     Serial.print("Write callback failed: ");
     Serial.println(result);
+    resetOperationState();
     return false;
   }
   
-  // Test read
   Serial.println("Testing read callback...");
   uint8_t readBuffer[256];
   result = _qspi_read(&_lfs_config, 0, 0, readBuffer, sizeof(readBuffer));
   if (result != 0) {
     Serial.print("Read callback failed: ");
     Serial.println(result);
+    resetOperationState();
     return false;
   }
   
-  // Verify data
   bool dataOk = true;
   for (int i = 0; i < 256; i++) {
     if (readBuffer[i] != 0xAA) {
@@ -330,48 +343,223 @@ bool CustomLFS_QSPIFlash::testLFSCallbacks()
   
   Serial.print("Callback test: ");
   Serial.println(dataOk ? "SUCCESS" : "FAILED");
+  
+  resetOperationState();
+  
   return dataOk;
 }
 
-bool CustomLFS_QSPIFlash::configureP25Q16H()
+// Callback-compatible qspiRead()
+bool CustomLFS_QSPIFlash::qspiRead(uint32_t addr, void *buffer, uint32_t size)
 {
-  // Reset enable command
-  nrf_qspi_cinstr_conf_t cinstr_cfg = {
-    .opcode = 0x66,  // RSTEN
+  if (!_qspi_initialized || !buffer || size == 0) {
+    return false;
+  }
+  
+  if (_operation_pending) {
+    return false;
+  }
+  
+  _operation_pending = true;
+  _operation_complete = false;
+  _current_operation = QSPI_OP_READ;
+  _operation_result = NRFX_ERROR_BUSY;
+  
+  nrfx_err_t err = nrfx_qspi_read(buffer, size, addr);
+  if (err != NRFX_SUCCESS) {
+    resetOperationState();
+    return false;
+  }
+  
+  bool success = waitForOperation(5000);
+  
+  if (_operation_pending) {
+    resetOperationState();
+  }
+  
+  return success;
+}
+
+// Callback-compatible qspiWrite()
+bool CustomLFS_QSPIFlash::qspiWrite(uint32_t addr, const void *buffer, uint32_t size)
+{
+  if (!_qspi_initialized || !buffer || size == 0) {
+    return false;
+  }
+  
+  if (_operation_pending) {
+    return false;
+  }
+  
+  _operation_pending = true;
+  _operation_complete = false;
+  _current_operation = QSPI_OP_WRITE;
+  _operation_result = NRFX_ERROR_BUSY;
+  
+  nrfx_err_t err = nrfx_qspi_write(buffer, size, addr);
+  if (err != NRFX_SUCCESS) {
+    resetOperationState();
+    return false;
+  }
+  
+  bool success = waitForOperation(10000); // Longer timeout for writes
+  
+  if (_operation_pending) {
+    resetOperationState();
+  }
+  
+  return success;
+}
+
+// Callback-compatible qspiErase()
+bool CustomLFS_QSPIFlash::qspiErase(uint32_t addr, uint32_t size)
+{
+  if (!_qspi_initialized) {
+    return false;
+  }
+  
+  if (_operation_pending) {
+    return false;
+  }
+  
+  _operation_pending = true;
+  _operation_complete = false;
+  _current_operation = QSPI_OP_ERASE;
+  _operation_result = NRFX_ERROR_BUSY;
+  
+  nrfx_err_t err = nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB, addr);
+  if (err != NRFX_SUCCESS) {
+    resetOperationState();
+    return false;
+  }
+  
+  bool success = waitForOperation(30000); // Longest timeout for erase
+  
+  if (_operation_pending) {
+    resetOperationState();
+  }
+  
+  return success;
+}
+
+void CustomLFS_QSPIFlash::resetOperationState()
+{
+  _operation_pending = false;
+  _operation_complete = false;
+  _current_operation = QSPI_OP_NONE;
+  _operation_result = NRFX_SUCCESS;
+}
+
+// Helper function - waitForOperation()
+bool CustomLFS_QSPIFlash::waitForOperation(uint32_t timeout_ms)
+{
+  uint32_t start = millis();
+  
+  while (_operation_pending && (millis() - start) < timeout_ms) {
+    delay(1);
+    
+    if (_operation_complete) {
+      _operation_pending = false;
+      return (_operation_result == NRFX_SUCCESS);
+    }
+  }
+  
+  if (_operation_complete) {
+    _operation_pending = false;
+    return (_operation_result == NRFX_SUCCESS);
+  }
+  
+  if (_operation_pending) {
+    resetOperationState();
+    return false;
+  }
+  
+  return (_operation_result == NRFX_SUCCESS);
+}
+
+
+uint8_t CustomLFS_QSPIFlash::readStatus(uint8_t register_num)
+{
+  if (!_qspi_initialized) {
+    return 0xFF;
+  }
+  
+  uint8_t opcode;
+  switch (register_num) {
+    case 1:
+      opcode = 0x05;  // Read Status Register 1
+      break;
+    case 2:
+      opcode = 0x35;  // Read Status Register 2
+      break;
+    case 3:
+      opcode = 0x15;  // Read Status Register 3
+      break;
+    default:
+      return 0xFF;
+  }
+  
+  uint8_t status = 0xFF;
+  nrf_qspi_cinstr_conf_t cfg = {
+    .opcode = opcode,
+    .length = NRF_QSPI_CINSTR_LEN_2B,
+    .io2_level = true,
+    .io3_level = true,
+    .wipwait = false,
+    .wren = false
+  };
+  
+  if (nrfx_qspi_cinstr_xfer(&cfg, NULL, &status) == NRFX_SUCCESS) {
+    return status;
+  }
+  
+  return 0xFF;
+}
+
+bool CustomLFS_QSPIFlash::writeStatus(uint8_t value, uint8_t register_num)
+{
+  if (!_qspi_initialized) {
+    return false;
+  }
+  
+  // Write Enable first
+  nrf_qspi_cinstr_conf_t cfg = {
+    .opcode = 0x06,  // WREN
     .length = NRF_QSPI_CINSTR_LEN_1B,
     .io2_level = true,
     .io3_level = true,
     .wipwait = false,
-    .wren = true
+    .wren = false
   };
   
-  if (nrfx_qspi_cinstr_xfer(&cinstr_cfg, NULL, NULL) != NRFX_SUCCESS) {
-    Serial.println("Reset enable failed");
+  if (nrfx_qspi_cinstr_xfer(&cfg, NULL, NULL) != NRFX_SUCCESS) {
     return false;
   }
   
-  // Reset command
-  cinstr_cfg.opcode = 0x99;  // RST
-  if (nrfx_qspi_cinstr_xfer(&cinstr_cfg, NULL, NULL) != NRFX_SUCCESS) {
-    Serial.println("Reset command failed");
-    return false;
+  // Write status register
+  uint8_t opcode;
+  switch (register_num) {
+    case 1:
+      opcode = 0x01;  // Write Status Register 1
+      break;
+    case 2:
+      opcode = 0x31;  // Write Status Register 2 (some chips)
+      break;
+    case 3:
+      opcode = 0x11;  // Write Status Register 3 (some chips)
+      break;
+    default:
+      return false;
   }
   
-  // Configure for QSPI mode - Write Status Register
-  uint8_t status_data[] = {0x00, 0x02};  // Enable QE bit
-  cinstr_cfg.opcode = 0x01;  // WRSR
-  cinstr_cfg.length = NRF_QSPI_CINSTR_LEN_3B;
+  cfg.opcode = opcode;
+  cfg.length = NRF_QSPI_CINSTR_LEN_2B;
+  cfg.wipwait = true;  // Wait for operation to complete
   
-  if (nrfx_qspi_cinstr_xfer(&cinstr_cfg, status_data, NULL) != NRFX_SUCCESS) {
-    Serial.println("QSPI mode enable failed");
-    return false;
-  } else {
-    Serial.println("QSPI quad mode enabled");
-  }
-  
-  Serial.println("P25Q16H configured for QSPI mode");
-  return true;
+  return (nrfx_qspi_cinstr_xfer(&cfg, &value, NULL) == NRFX_SUCCESS);
 }
+
+
 
 bool CustomLFS_QSPIFlash::waitForQSPIReady()
 {
@@ -446,38 +634,7 @@ bool CustomLFS_QSPIFlash::detectChip()
   return true;  // Continue with defaults
 }
 
-bool CustomLFS_QSPIFlash::qspiRead(uint32_t addr, void *buffer, uint32_t size)
-{
-  if (!_qspi_initialized || !buffer || size == 0) {
-    return false;
-  }
-  
-  // Simple blocking call - remove all async handling
-  nrfx_err_t err = nrfx_qspi_read(buffer, size, addr);
-  return (err == NRFX_SUCCESS);
-}
 
-bool CustomLFS_QSPIFlash::qspiWrite(uint32_t addr, const void *buffer, uint32_t size)
-{
-  if (!_qspi_initialized || !buffer || size == 0) {
-    return false;
-  }
-  
-  // Simple blocking call
-  nrfx_err_t err = nrfx_qspi_write(buffer, size, addr);
-  return (err == NRFX_SUCCESS);
-}
-
-bool CustomLFS_QSPIFlash::qspiErase(uint32_t addr, uint32_t size)
-{
-  if (!_qspi_initialized) {
-    return false;
-  }
-  
-  // Simple blocking call
-  nrfx_err_t err = nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB, addr);
-  return (err == NRFX_SUCCESS);
-}
 
 bool CustomLFS_QSPIFlash::qspiWaitReady(uint32_t timeout_ms)
 {
@@ -512,7 +669,22 @@ void CustomLFS_QSPIFlash::_configure_lfs()
   memset(&_lfs_config, 0, sizeof(_lfs_config));
   
   _lfs_config.context = this;
+    // DEBUG: Verify context pointer immediately
+  Serial.print("_configure_lfs: Setting context to: 0x");
+  Serial.println((uintptr_t)this, HEX);
+  Serial.print("_configure_lfs: Context verification - _operation_pending = ");
+  Serial.println(_operation_pending);
+  Serial.print("_configure_lfs: Context verification - _qspi_initialized = ");
+  Serial.println(_qspi_initialized);
   
+  // Test the context pointer immediately
+  CustomLFS_QSPIFlash* test_ctx = (CustomLFS_QSPIFlash*)_lfs_config.context;
+  Serial.print("_configure_lfs: Retrieved context: 0x");
+  Serial.println((uintptr_t)test_ctx, HEX);
+  Serial.print("_configure_lfs: Retrieved context _operation_pending = ");
+  Serial.println(test_ctx->_operation_pending);
+  
+
   // Callbacks
   _lfs_config.read = _qspi_read;
   _lfs_config.prog = _qspi_prog;
@@ -526,7 +698,7 @@ void CustomLFS_QSPIFlash::_configure_lfs()
   _lfs_config.block_count = _total_size / _sector_size;
   
   // Reduce lookahead for smaller flash
-  _lfs_config.lookahead = 32;            // Smaller lookahead for 2MB flash. TODO research possible better values?
+  _lfs_config.lookahead = 32;            // Smaller lookahead for 2MB flash
   
   // Allocate static buffers instead of dynamic (more reliable)
   static uint8_t read_buffer[256];
@@ -543,16 +715,16 @@ void CustomLFS_QSPIFlash::_configure_lfs()
   _flash_total_size = _total_size;
   _block_size = _sector_size;
   
-  // Debug the configuration
-  Serial.println("=== LittleFS Configuration ===");
-  Serial.print("Block size: "); Serial.println(_lfs_config.block_size);
-  Serial.print("Block count: "); Serial.println(_lfs_config.block_count);
-  Serial.print("Read size: "); Serial.println(_lfs_config.read_size);
-  Serial.print("Prog size: "); Serial.println(_lfs_config.prog_size);
-  Serial.print("Lookahead: "); Serial.println(_lfs_config.lookahead);
-  Serial.print("Total size: "); 
-  Serial.print(_lfs_config.block_count * _lfs_config.block_size / 1024);
-  Serial.println(" KB");
+  // // Debug the configuration
+  // Serial.println("=== LittleFS Configuration ===");
+  // Serial.print("Block size: "); Serial.println(_lfs_config.block_size);
+  // Serial.print("Block count: "); Serial.println(_lfs_config.block_count);
+  // Serial.print("Read size: "); Serial.println(_lfs_config.read_size);
+  // Serial.print("Prog size: "); Serial.println(_lfs_config.prog_size);
+  // Serial.print("Lookahead: "); Serial.println(_lfs_config.lookahead);
+  // Serial.print("Total size: "); 
+  // Serial.print(_lfs_config.block_count * _lfs_config.block_size / 1024);
+  // Serial.println(" KB");
 }
 
 bool CustomLFS_QSPIFlash::testFlash()
@@ -605,41 +777,6 @@ bool CustomLFS_QSPIFlash::testFlash()
   return true;
 }
 
-bool CustomLFS_QSPIFlash::benchmark(uint32_t test_size)
-{
-  if (!_qspi_initialized) return false;
-  
-  Serial.println("Running benchmark...");
-  Serial.print("Test size: ");
-  Serial.println(test_size);
-  
-  // Simple timing test
-  uint32_t start = millis();
-  
-  // Test reads
-  uint8_t buffer[256];
-  for (uint32_t addr = 0; addr < test_size; addr += sizeof(buffer)) {
-    if (!qspiRead(addr, buffer, sizeof(buffer))) {
-      Serial.println("Benchmark read failed");
-      return false;
-    }
-  }
-  
-  uint32_t read_time = millis() - start;
-  
-  Serial.print("Read time: ");
-  Serial.print(read_time);
-  Serial.println(" ms");
-  
-  if (read_time > 0) {
-    Serial.print("Read speed: ");
-    Serial.print((test_size * 1000) / (read_time * 1024));
-    Serial.println(" KB/s");
-  }
-  
-  return true;
-}
-
 bool CustomLFS_QSPIFlash::lowLevelFormat()
 {
   Serial.println("WARNING: This will erase all data!");
@@ -664,28 +801,6 @@ bool CustomLFS_QSPIFlash::lowLevelFormat()
   return true;
 }
 
-void CustomLFS_QSPIFlash::debugQSPIState()
-{
-  Serial.println("=== QSPI Register Debug ===");
-  Serial.print("ENABLE: 0x");
-  Serial.println(NRF_QSPI->ENABLE, HEX);
-  Serial.print("STATUS: 0x");
-  Serial.println(NRF_QSPI->STATUS, HEX);
-  Serial.print("IFCONFIG0: 0x");
-  Serial.println(NRF_QSPI->IFCONFIG0, HEX);
-  Serial.print("IFCONFIG1: 0x");
-  Serial.println(NRF_QSPI->IFCONFIG1, HEX);
-  
-  // Check individual status bits
-  bool ready = (NRF_QSPI->STATUS & QSPI_STATUS_READY_Msk) != 0;
-  bool dpm = (NRF_QSPI->STATUS & QSPI_STATUS_DPM_Msk) != 0;
-  bool sreg = (NRF_QSPI->STATUS & QSPI_STATUS_SREG_Msk) != 0;
-  
-  Serial.print("READY bit: "); Serial.println(ready);
-  Serial.print("DPM bit: "); Serial.println(dpm);
-  Serial.print("SREG bit: "); Serial.println(sreg);
-}
-
 bool CustomLFS_QSPIFlash::isQSPIReady()
 {
   if (!_qspi_initialized) {
@@ -705,13 +820,9 @@ bool CustomLFS_QSPIFlash::isQSPIReady()
 }
 
 
-// Placeholder functions for later
-bool CustomLFS_QSPIFlash::enableQuadMode() { return false; }  // Disable for now
-bool CustomLFS_QSPIFlash::checkQuadMode() { return false; }
-uint8_t CustomLFS_QSPIFlash::readStatus(uint8_t reg) { return 0xFF; }
-bool CustomLFS_QSPIFlash::writeStatus(uint8_t val, uint8_t reg) { return false; }
-bool CustomLFS_QSPIFlash::setClockFrequency(uint32_t freq) { return false; }
-bool CustomLFS_QSPIFlash::enableMemoryMapping() { return _qspi_initialized; }
-bool CustomLFS_QSPIFlash::disableMemoryMapping() { return true; }
+// // placeholders for now
+// bool CustomLFS_QSPIFlash::setClockFrequency(uint32_t freq) { return false; }
+// bool CustomLFS_QSPIFlash::enableMemoryMapping() { return _qspi_initialized; }
+// bool CustomLFS_QSPIFlash::disableMemoryMapping() { return true; }
 
 #endif // NRF52840_XXAA

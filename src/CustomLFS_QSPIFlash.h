@@ -1,7 +1,6 @@
 /* 
  * CustomLFS_QSPIFlash.h - QSPI Flash support for CustomLFS
- * Version v0.1
- * 
+ *
  * Copyright (c) 2025 oltaco <taco@sly.nu>
  *
  * The MIT License (MIT)
@@ -75,9 +74,11 @@ class CustomLFS_QSPIFlash : public CustomLFS
 private:
   // QSPI hardware configuration
   nrfx_qspi_config_t _qspi_config;
-  bool _qspi_initialized;
+
   bool _quad_mode_enabled;
-  
+  bool _quad_read_enabled;
+  bool _quad_write_enabled;
+
   // Flash chip information
   const QSPIFlashChip *_chip;
   uint32_t _total_size;
@@ -93,12 +94,24 @@ private:
   // Internal state
   volatile bool _operation_pending;
   nrfx_err_t _last_error;
+
+  // Operation state tracking
+  enum QSPIOperation {
+    QSPI_OP_NONE,
+    QSPI_OP_READ,
+    QSPI_OP_WRITE,
+    QSPI_OP_ERASE
+  };
+
+  volatile QSPIOperation _current_operation;
+  volatile bool _operation_complete;
+  volatile nrfx_err_t _operation_result;
   
+  bool waitForOperation(uint32_t timeout_ms);
+  void resetOperationState();
+
   // Flash detection and configuration
   bool detectChip();
-  bool configureChip();
-  bool enableQuadMode();
-  bool checkQuadMode();
   
   // Low-level flash operations
   bool qspiRead(uint32_t addr, void *buffer, uint32_t size);
@@ -106,18 +119,12 @@ private:
   bool qspiErase(uint32_t addr, uint32_t size = 0);  // 0 = sector erase
   bool qspiWaitReady(uint32_t timeout_ms = 10000);
   
+  // handy for debugging but maybe remove?
   bool testLFSCallbacks();
 
   // Status and control operations
   uint8_t readStatus(uint8_t register_num = 1);
   bool writeStatus(uint8_t value, uint8_t register_num = 1);
-  bool sendCustomInstruction(uint8_t opcode, const void *tx_buffer = nullptr, 
-                           uint32_t tx_length = 0, void *rx_buffer = nullptr, 
-                           uint32_t rx_length = 0);
-  
-  // Address handling for 3-byte vs 4-byte addressing
-  bool enter4ByteMode();
-  bool exit4ByteMode();
   
   // Static callback functions for LittleFS operations
   static int _qspi_read(const struct lfs_config *c, lfs_block_t block, 
@@ -133,23 +140,19 @@ private:
   // Configure LFS for QSPI flash
   virtual void _configure_lfs() override;
 
-  bool configureP25Q16H();
-  bool waitForQSPIReady();
 
 public:
   // Constructor
   CustomLFS_QSPIFlash();
   
+  bool _qspi_initialized;
   // Initialization with pin configuration
   bool begin(uint8_t sck_pin = PIN_QSPI_SCK, uint8_t csn_pin = PIN_QSPI_CS,
              uint8_t io0_pin = PIN_QSPI_IO0, uint8_t io1_pin = PIN_QSPI_IO1,
              uint8_t io2_pin = PIN_QSPI_IO2, uint8_t io3_pin = PIN_QSPI_IO3);
   
   // Configuration methods
-  bool setClockFrequency(uint32_t frequency_hz);
-  bool setQuadMode(bool enable_read, bool enable_write);
-  bool setPins(uint8_t sck_pin, uint8_t csn_pin, uint8_t io0_pin, 
-               uint8_t io1_pin, uint8_t io2_pin, uint8_t io3_pin);
+  // bool setClockFrequency(uint32_t frequency_hz);
   
   // Information methods
   uint32_t getFlashSize() const { return _total_size; }
@@ -157,29 +160,30 @@ public:
   uint32_t getPageSize() const { return _page_size; }
   uint32_t getClockFrequency() const { return _clock_frequency; }
   const char* getChipName() const { return _chip ? _chip->name : "Unknown"; }
-  
+
+  // remove?
   bool isReady() const { return _qspi_initialized && !_operation_pending; }
   bool isQuadModeEnabled() const { return _quad_mode_enabled; }
   bool supportsQuadRead() const { return _chip ? _chip->supports_quad_read : false; }
   bool supportsQuadWrite() const { return _chip ? _chip->supports_quad_write : false; }
-  
+
   // Advanced operations
   bool lowLevelFormat();
   bool testFlash();
-  bool benchmark(uint32_t test_size = 4096);
   
+
   bool isQSPIReady();
-  void debugQSPIState();
+  bool waitForQSPIReady();
    
   // Direct flash access for advanced users
   bool rawRead(uint32_t addr, void *buffer, uint32_t size) { return qspiRead(addr, buffer, size); }
   bool rawWrite(uint32_t addr, const void *buffer, uint32_t size) { return qspiWrite(addr, buffer, size); }
   bool rawErase(uint32_t addr, uint32_t size = 0) { return qspiErase(addr, size); }
   
-  // Memory mapping support (XIP - Execute in Place)
-  void* getMemoryMappedAddress() const { return (void*)0x12000000; }  // nRF52840 QSPI XIP base
-  bool enableMemoryMapping();
-  bool disableMemoryMapping();
+  // // Memory mapping support (XIP - Execute in Place)
+  // void* getMemoryMappedAddress() const { return (void*)0x12000000; }  // nRF52840 QSPI XIP base
+  // bool enableMemoryMapping();
+  // bool disableMemoryMapping();
   
   // Override parent class methods that don't apply to QSPI
   bool setFlashRegion(uint32_t flash_addr, uint32_t flash_size, 
