@@ -28,6 +28,7 @@
 
 #include "CustomLFS_QSPIFlash.h"
 #include "Adafruit_TinyUSB.h"
+#include "Arduino.h"
 
 // Check if QSPI is enabled
 #if !defined(NRFX_QSPI_ENABLED) || (NRFX_QSPI_ENABLED != 1)
