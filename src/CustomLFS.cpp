@@ -55,13 +55,30 @@ int CustomLFS::_flash_prog(const struct lfs_config *c, lfs_block_t block,
 int CustomLFS::_flash_erase(const struct lfs_config *c, lfs_block_t block)
 {
   CustomLFS* fs = (CustomLFS*)c->context;
-  uint32_t addr = fs->lba2addr(block);
+  uint32_t block_addr = fs->lba2addr(block);
+  uint32_t page_addr = block_addr & ~(FLASH_NRF52_PAGE_SIZE - 1);
+  uint32_t offset = block_addr - page_addr;
 
-  // Implement as write 0xff to whole block address
-  for(int i = 0; i < fs->_block_size; i++)
-  {
-    flash_nrf5x_write8(addr + i, 0xFF);
+  static uint8_t page_buf[FLASH_NRF52_PAGE_SIZE];  // 4KB static buffer
+
+  // Read entire 4KB page
+  VERIFY(flash_nrf5x_read(page_buf, page_addr, FLASH_NRF52_PAGE_SIZE) > 0, -1);
+
+  // Check if block region is already erased
+  bool clean = true;
+  for (uint32_t i = 0; i < fs->_block_size; i++) {
+    if (page_buf[offset + i] != 0xFF) { clean = false; break; }
   }
+  if (clean) return 0;
+
+  // Set block region to 0xFF in buffer
+  memset(&page_buf[offset], 0xFF, fs->_block_size);
+
+  // Erase entire 4KB page, then write preserved data back
+  VERIFY(flash_nrf5x_erase(page_addr), -1);
+  flash_nrf5x_flush();
+  VERIFY(flash_nrf5x_write(page_addr, page_buf, FLASH_NRF52_PAGE_SIZE) > 0, -1);
+  flash_nrf5x_flush();
 
   return 0;
 }
