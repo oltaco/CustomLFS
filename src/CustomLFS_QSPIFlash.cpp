@@ -23,6 +23,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef USE_CUSTOMLFS2 // guard against compilation when using CustomLFS2
 
 #ifdef NRF52840_XXAA
 
@@ -893,3 +894,5 @@ bool CustomLFS_QSPIFlash::isQSPIReady()
 // bool CustomLFS_QSPIFlash::disableMemoryMapping() { return true; }
 
 #endif // NRF52840_XXAA
+
+#endif // USE_CUSTOMLFS2

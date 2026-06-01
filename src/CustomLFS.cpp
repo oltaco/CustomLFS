@@ -23,6 +23,7 @@
  * THE SOFTWARE.
  */
 
+#ifndef USE_CUSTOMLFS2 // guard against compilation when using CustomLFS2
 #include "CustomLFS.h"
 
 // Global instance for backward compatibility
@@ -257,3 +258,5 @@ bool CustomLFS::formatRegion(void)
   // Format the filesystem
   return format();
 }
+
+#endif // USE_CUSTOMLFS2

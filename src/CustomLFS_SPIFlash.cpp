@@ -25,6 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef USE_CUSTOMLFS2 // guard against compilation when using CustomLFS2
 
 #include "CustomLFS_SPIFlash.h"
 
@@ -700,3 +701,5 @@ bool CustomLFS_SPIFlash::testFlash()
   
   return true;
 }
+
+#endif //  CUSTOMLFS2_ONLY
