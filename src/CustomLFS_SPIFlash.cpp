@@ -5,7 +5,7 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2020, Paul Stoffregen, paul@pjrc.com
- * Copyright (c) 2025 oltaco <taco@sly.nu>
+ * Copyright (c) 2025, 2026 oltaco <taco@sly.nu>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -139,6 +139,23 @@ const SPIFlashChipExt spiFlashChipsExt[] = {
   .single_status_byte = 0,
   .is_fram = 0,
   .name = "ZD25WQ32C"
+  },
+  {
+  .total_size = (1UL << 23),           // 8MiB
+  .start_up_time_us = 12000,
+  .manufacturer_id = 0xc8,
+  .memory_type = 0x40,
+  .capacity = 0x17,
+  .max_clock_speed_mhz = 85,
+  .quad_enable_bit_mask = 0x02,
+  .has_sector_protection = 0,
+  .supports_fast_read = 1,
+  .supports_qspi = 1,
+  .supports_qspi_writes = 1,
+  .write_status_register_split = 0,
+  .single_status_byte = 0,
+  .is_fram = 0,
+  .name = "GD25Q64C"
   }
   // Add more extended chips here as needed
 };
