@@ -57,7 +57,7 @@ int CustomLFS::_flash_erase(const struct lfs_config *c, lfs_block_t block)
   CustomLFS* fs = (CustomLFS*)c->context;
   uint32_t addr = fs->lba2addr(block);
 
-  // Implement as write 0xff to whole block address
+  // Write 0xFF to erase block; flash_cache_write handles the page erase cycle internally
   for(int i = 0; i < fs->_block_size; i++)
   {
     flash_nrf5x_write8(addr + i, 0xFF);
