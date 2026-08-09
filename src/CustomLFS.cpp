@@ -56,12 +56,22 @@ int CustomLFS::_flash_erase(const struct lfs_config *c, lfs_block_t block)
 {
   CustomLFS* fs = (CustomLFS*)c->context;
   uint32_t addr = fs->lba2addr(block);
+  uint32_t bs = fs->_block_size;
 
-  // Implement as write 0xff to whole block address
-  for(int i = 0; i < fs->_block_size; i++)
-  {
-    flash_nrf5x_write8(addr + i, 0xFF);
+  // Skip if already erased
+  uint8_t buf[bs];  // VLA — bs <= FLASH_NRF52_PAGE_SIZE, validated in validateFlashRegion
+  VERIFY(flash_nrf5x_read(buf, addr, bs) > 0, -1);
+  bool clean = true;
+  for (uint32_t i = 0; i < bs; i++) {
+    if (buf[i] != 0xFF) { clean = false; break; }
   }
+  if (clean) return 0;
+
+  // Write 0xFF through the cache layer — the Adafruit flash cache handles
+  // the actual page erase during flush, and naturally batches multiple block
+  // erases within the same 4KB page into a single erase+write cycle.
+  memset(buf, 0xFF, bs);
+  VERIFY(flash_nrf5x_write(addr, buf, bs), -1);
 
   return 0;
 }
